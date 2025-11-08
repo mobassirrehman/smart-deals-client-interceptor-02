@@ -7,8 +7,14 @@ const ProductDetails = () => {
   const { _id: productId } = useLoaderData();
   const [bids, setBids] = useState([]);
   const bidModalRef = useRef(null);
-  const { user } = useContext(AuthContexts);
-  console.log(user);
+  const { user, loading } = useContext(AuthContexts);
+
+  console.log("=== USER DEBUG ===");
+  console.log("user:", user);
+  console.log("user?.displayName:", user?.displayName);
+  console.log("user?.email:", user?.email);
+  console.log("loading:", loading);
+  console.log("=================");
 
   useEffect(() => {
     fetch(`http://localhost:3000/products/bids/${productId}`)
@@ -28,6 +34,15 @@ const ProductDetails = () => {
     const email = event.target.email.value;
     const bid = event.target.bid.value;
     console.log(productId, name, email, bid);
+
+    console.log("=== FORM DEBUG ===");
+    console.log("event.target.name:", event.target.name);
+    console.log("event.target.name.value:", event.target.name.value);
+    console.log("event.target.email:", event.target.email);
+    console.log("event.target.email.value:", event.target.email.value);
+    console.log("event.target.bid:", event.target.bid);
+    console.log("event.target.bid.value:", event.target.bid.value);
+    console.log("==================");
 
     const newBid = {
       product: productId,
@@ -88,7 +103,7 @@ const ProductDetails = () => {
                     name="name"
                     className="input"
                     readOnly
-                    defaultValue={user?.displayName}
+                    value={user?.displayName}
                   />
                   {/* email */}
                   <label className="label">Email</label>
@@ -97,7 +112,7 @@ const ProductDetails = () => {
                     className="input"
                     name="email"
                     readOnly
-                    defaultValue={user?.email}
+                    value={user?.email}
                   />
                   {/* bid amount */}
                   <label className="label">Bid</label>
