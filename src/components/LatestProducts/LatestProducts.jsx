@@ -1,9 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Product from "../Product/Product";
 
-const LatestProducts = (latestProductsPromise) => {
-  const products = useState(latestProductsPromise);
-  console.log(products);
+const LatestProducts = () => {
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    fetch("http://localhost:3000/latest-products")
+      .then((res) => res.json())
+      .then((data) => setProducts(data));
+  }, []);
+
   return (
     <div>
       <h2 className="text-5xl">Recent Products</h2>

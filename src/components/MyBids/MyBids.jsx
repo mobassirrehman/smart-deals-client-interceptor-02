@@ -7,15 +7,25 @@ const MyBids = () => {
   const [bids, setBids] = useState([]);
 
   useEffect(() => {
-    if (user?.email) {
-      fetch(`http://localhost:3000/bids?email=${user.email}`)
+    if (user?.email && user?.accessToken) {
+      fetch(`http://localhost:3000/bids?email=${user.email}`, {
+        headers: {
+          authorization: `Bearer ${user.accessToken}`,
+        },
+      })
         .then((res) => res.json())
         .then((data) => {
-          console.log(data);
-          setBids(data);
+          if (Array.isArray(data)) {
+            setBids(data);
+          } else {
+            setBids([]);
+          }
+        })
+        .catch((error) => {
+          setBids([]);
         });
     }
-  }, [user?.email]);
+  }, [user]);
 
   const handleDeleteBid = (_id) => {
     Swal.fire({
@@ -54,7 +64,6 @@ const MyBids = () => {
       <h3>My Bids: {bids.length}</h3>
       <div className="overflow-x-auto">
         <table className="table">
-          {/* head */}
           <thead>
             <tr>
               <th>#</th>

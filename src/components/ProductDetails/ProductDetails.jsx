@@ -9,21 +9,26 @@ const ProductDetails = () => {
   const bidModalRef = useRef(null);
   const { user, loading } = useContext(AuthContexts);
 
-  console.log("=== USER DEBUG ===");
-  console.log("user:", user);
-  console.log("user?.displayName:", user?.displayName);
-  console.log("user?.email:", user?.email);
-  console.log("loading:", loading);
-  console.log("=================");
-
   useEffect(() => {
-    fetch(`http://localhost:3000/products/bids/${productId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        console.log("bids for this product", data);
-        setBids(data);
-      });
-  }, [productId]);
+    if (user?.accessToken) {
+      fetch(`http://localhost:3000/products/bids/${productId}`, {
+        headers: {
+          authorization: `Bearer ${user.accessToken}`,
+        },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setBids(data);
+          } else {
+            setBids([]);
+          }
+        })
+        .catch(() => {
+          setBids([]);
+        });
+    }
+  }, [productId, user]);
 
   const handleBidModalOpen = () => {
     bidModalRef.current.showModal();
@@ -33,16 +38,6 @@ const ProductDetails = () => {
     const name = event.target.name.value;
     const email = event.target.email.value;
     const bid = event.target.bid.value;
-    console.log(productId, name, email, bid);
-
-    console.log("=== FORM DEBUG ===");
-    console.log("event.target.name:", event.target.name);
-    console.log("event.target.name.value:", event.target.name.value);
-    console.log("event.target.email:", event.target.email);
-    console.log("event.target.email.value:", event.target.email.value);
-    console.log("event.target.bid:", event.target.bid);
-    console.log("event.target.bid.value:", event.target.bid.value);
-    console.log("==================");
 
     const newBid = {
       product: productId,
@@ -80,7 +75,6 @@ const ProductDetails = () => {
   };
   return (
     <div>
-      {/* product info */}
       <div>
         <div></div>
         <div>
@@ -105,7 +99,6 @@ const ProductDetails = () => {
                     readOnly
                     value={user?.displayName}
                   />
-                  {/* email */}
                   <label className="label">Email</label>
                   <input
                     type="email"
@@ -114,7 +107,6 @@ const ProductDetails = () => {
                     readOnly
                     value={user?.email}
                   />
-                  {/* bid amount */}
                   <label className="label">Bid</label>
                   <input
                     type="text"
@@ -137,7 +129,6 @@ const ProductDetails = () => {
           </dialog>
         </div>
       </div>
-      {/* bids for this product */}
       <div>
         <h3 className="text-3xl">
           Bids for this Product:{" "}
@@ -145,7 +136,6 @@ const ProductDetails = () => {
         </h3>
         <div className="overflow-x-auto">
           <table className="table">
-            {/* head */}
             <thead>
               <tr>
                 <th>SL No.</th>
@@ -156,10 +146,9 @@ const ProductDetails = () => {
               </tr>
             </thead>
             <tbody>
-              {/* row 1 */}
               {bids.map((bid, index) => (
-                <tr>
-                  <th>{index + 1} </th>
+                <tr key={bid._id}>
+                  <th>{index + 1}</th>
                   <td>
                     <div className="flex items-center gap-3">
                       <div className="avatar">
@@ -183,7 +172,6 @@ const ProductDetails = () => {
                   </th>
                 </tr>
               ))}
-              {/* row 2 */}
             </tbody>
           </table>
         </div>
