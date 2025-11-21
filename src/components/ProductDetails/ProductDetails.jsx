@@ -7,28 +7,27 @@ const ProductDetails = () => {
   const { _id: productId } = useLoaderData();
   const [bids, setBids] = useState([]);
   const bidModalRef = useRef(null);
-  const { user, loading } = useContext(AuthContexts);
+  const { user } = useContext(AuthContexts);
 
   useEffect(() => {
+    const headers = {};
     if (user?.accessToken) {
-      fetch(`http://localhost:3000/products/bids/${productId}`, {
-        headers: {
-          authorization: `Bearer ${user.accessToken}`,
-        },
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (Array.isArray(data)) {
-            setBids(data);
-          } else {
-            setBids([]);
-          }
-        })
-        .catch(() => {
-          setBids([]);
-        });
+      headers.authorization = `Bearer ${user.accessToken}`;
     }
-  }, [productId, user]);
+
+    fetch(`http://localhost:3000/products/bids/${productId}`, { headers })
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setBids(data);
+        } else {
+          setBids([]);
+        }
+      })
+      .catch(() => {
+        setBids([]);
+      });
+  }, [productId, user?.accessToken]);
 
   const handleBidModalOpen = () => {
     bidModalRef.current.showModal();
@@ -115,7 +114,7 @@ const ProductDetails = () => {
                     placeholder="Your Bid"
                   />
                   <button className="btn btn-neutral mt-4">
-                    Please your bid
+                    Place your bid
                   </button>
                 </fieldset>
               </form>
