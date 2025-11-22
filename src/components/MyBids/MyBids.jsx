@@ -38,23 +38,36 @@ const MyBids = () => {
       confirmButtonText: "Yes, delete it!",
     }).then((result) => {
       if (result.isConfirmed) {
-        fetch(`http://localhost:3000/bids/${_id}`, {
-          method: "DELETE",
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.deletedCount) {
-              Swal.fire({
-                title: "Deleted!",
-                text: "Your bid has been deleted.",
-                icon: "success",
-              });
+        user.getIdToken().then((token) => {
+          fetch(`http://localhost:3000/bids/${_id}`, {
+            method: "DELETE",
+            headers: {
+              authorization: `Bearer ${token}`,
+            },
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              console.log("Delete response:", data);
+              if (data.deletedCount) {
+                Swal.fire({
+                  title: "Deleted!",
+                  text: "Your bid has been deleted.",
+                  icon: "success",
+                });
 
-              //
-              const remainingBids = bids.filter((bid) => bid._id !== _id);
-              setBids(remainingBids);
-            }
-          });
+                const remainingBids = bids.filter((bid) => bid._id !== _id);
+                setBids(remainingBids);
+              }
+            })
+            .catch((error) => {
+              console.log("Delete error:", error);
+              Swal.fire({
+                title: "Error!",
+                text: "Failed to delete bid.",
+                icon: "error",
+              });
+            });
+        });
       }
     });
   };

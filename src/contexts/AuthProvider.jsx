@@ -7,7 +7,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
-import { auth } from "../firebase/firebase.init";
+import { auth } from "../../firebase/firebase.init";
 
 const googleProvider = new GoogleAuthProvider();
 

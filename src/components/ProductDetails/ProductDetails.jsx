@@ -2,38 +2,65 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import { useLoaderData } from "react-router";
 import { AuthContexts } from "../../contexts/AuthContexts";
 import Swal from "sweetalert2";
+import axios from "axios";
 
 const ProductDetails = () => {
-  const { _id: productId } = useLoaderData();
+  const loaderData = useLoaderData();
+  console.log("Loader data:", loaderData);
+  const productId = loaderData?._id;
   const [bids, setBids] = useState([]);
   const bidModalRef = useRef(null);
   const { user } = useContext(AuthContexts);
 
   useEffect(() => {
-    const headers = {};
-    if (user?.accessToken) {
-      headers.authorization = `Bearer ${user.accessToken}`;
-    }
-
-    fetch(`http://localhost:3000/products/bids/${productId}`, { headers })
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setBids(data);
-        } else {
-          setBids([]);
-        }
-      })
-      .catch(() => {
-        setBids([]);
+    if (user) {
+      user.getIdToken().then((token) => {
+        axios
+          .get(`http://localhost:3000/products/bids/${productId}`, {
+            headers: { authorization: `Bearer ${token}` },
+          })
+          .then((response) => {
+            console.log("after axios get", response.data);
+            if (Array.isArray(response.data)) {
+              setBids(response.data);
+            } else {
+              setBids([]);
+            }
+          })
+          .catch((error) => {
+            console.log("axios error:", error);
+            setBids([]);
+          });
       });
-  }, [productId, user?.accessToken]);
+    }
+  }, [productId, user]);
+
+  // useEffect(() => {
+  //   const headers = {};
+  //   if (user?.accessToken) {
+  //     headers.authorization = `Bearer ${user.accessToken}`;
+  //   }
+
+  //   fetch(`http://localhost:3000/products/bids/${productId}`, { headers })
+  //     .then((res) => res.json())
+  //     .then((data) => {
+  //       if (Array.isArray(data)) {
+  //         setBids(data);
+  //       } else {
+  //         setBids([]);
+  //       }
+  //     })
+  //     .catch(() => {
+  //       setBids([]);
+  //     });
+  // }, [productId, user?.accessToken]);
 
   const handleBidModalOpen = () => {
     bidModalRef.current.showModal();
   };
   const handleBidSubmit = (event) => {
     event.preventDefault();
+    console.log("handleBidSubmit called");
     const name = event.target.name.value;
     const email = event.target.email.value;
     const bid = event.target.bid.value;
@@ -46,31 +73,40 @@ const ProductDetails = () => {
       bid_price: bid,
       status: "pending",
     };
-    fetch("http://localhost:3000/bids", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(newBid),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.insertedId) {
-          bidModalRef.current.close();
-          Swal.fire({
-            position: "top-end",
-            icon: "success",
-            title: "Your bid has been placed.",
-            showConfirmButton: false,
-            timer: 1500,
-          });
-          // add the new bid to the state
-          newBid._id = data.insertedId;
-          const newBids = [...bids, newBid];
-          newBids.sort((a, b) => b.bid_price - a.bid_price);
-          setBids(newBids);
-        }
-      });
+    console.log("Submitting bid:", newBid);
+
+    user.getIdToken().then((token) => {
+      fetch("http://localhost:3000/bids", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(newBid),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          console.log("Response data:", data);
+          if (data.insertedId) {
+            bidModalRef.current.close();
+            Swal.fire({
+              position: "top-end",
+              icon: "success",
+              title: "Your bid has been placed.",
+              showConfirmButton: false,
+              timer: 1500,
+            });
+            // add the new bid to the state
+            newBid._id = data.insertedId;
+            const newBids = [...bids, newBid];
+            newBids.sort((a, b) => b.bid_price - a.bid_price);
+            setBids(newBids);
+          }
+        })
+        .catch((error) => {
+          console.log("Bid submit error:", error);
+        });
+    });
   };
   return (
     <div>
@@ -96,7 +132,7 @@ const ProductDetails = () => {
                     name="name"
                     className="input"
                     readOnly
-                    value={user?.displayName}
+                    defaultValue={user?.displayName}
                   />
                   <label className="label">Email</label>
                   <input
@@ -104,7 +140,7 @@ const ProductDetails = () => {
                     className="input"
                     name="email"
                     readOnly
-                    value={user?.email}
+                    defaultValue={user?.email}
                   />
                   <label className="label">Bid</label>
                   <input
