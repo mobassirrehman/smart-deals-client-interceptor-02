@@ -1,11 +1,13 @@
 import React from "react";
 import Swal from "sweetalert2";
 import useAuth from "../../hooks/useAuth";
-import useAxios from "../../hooks/useAxios";
+// import useAxios from "../../hooks/useAxios";
+import useAxiosSecure from "../../hooks/useAxiosSecure";
 
 const CreateAProduct = () => {
   const { user } = useAuth();
-  const axiosInstances = useAxios();
+  // const axiosInstances = useAxios();
+  const axiosSecure = useAxiosSecure();
 
   const handleCreateAProduct = (e) => {
     e.preventDefault();
@@ -57,32 +59,38 @@ const CreateAProduct = () => {
     //       console.log("Error creating product:", error);
     //     });
     // });
-    user.getIdToken().then((token) => {
-      axiosInstances
-        .post("/products", newProduct, {
-          headers: { authorization: `Bearer ${token}` },
-        })
-        .then((data) => {
-          console.log(data.data);
-          if (data.data.insertedId) {
-            Swal.fire({
-              position: "top-end",
-              icon: "success",
-              title: "Your Product has been Created.",
-              showConfirmButton: false,
-              timer: 1500,
-            });
-            e.target.reset();
-          }
-        })
-        .catch((error) => {
-          console.log("Error creating product:", error);
-          Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: "Failed to create product",
-          });
-        });
+
+    //---------------------------//
+
+    // user.getIdToken().then((token) => {
+    //   axiosInstances
+    //     .post("/products", newProduct, {
+    //       headers: { authorization: `Bearer ${token}` },
+    //     })
+    //     .then((data) => {
+    //       console.log(data.data);
+    //       if (data.data.insertedId) {
+    //         Swal.fire({
+    //           position: "top-end",
+    //           icon: "success",
+    //           title: "Your Product has been Created.",
+    //           showConfirmButton: false,
+    //           timer: 1500,
+    //         });
+    //         e.target.reset();
+    //       }
+    //     })
+    //     .catch((error) => {
+    //       console.log("Error creating product:", error);
+    //       Swal.fire({
+    //         icon: "error",
+    //         title: "Error",
+    //         text: "Failed to create product",
+    //       });
+    //     });
+    // });
+    axiosSecure.post("/products", newProduct).then((data) => {
+      console.log("after secure call", data.data);
     });
   };
   return (
