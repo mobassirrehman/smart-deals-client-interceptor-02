@@ -1,216 +1,404 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { use, useEffect, useRef, useState } from "react";
 import { useLoaderData } from "react-router";
 import { AuthContexts } from "../../contexts/AuthContexts";
 import Swal from "sweetalert2";
-import axios from "axios";
+import useAxiosSecure from "../../hooks/useAxiosSecure";
 
 const ProductDetails = () => {
-  const loaderData = useLoaderData();
-  console.log("Loader data:", loaderData);
-  const productId = loaderData?._id;
+  const product = useLoaderData();
   const [bids, setBids] = useState([]);
+  const [loading, setLoading] = useState(true);
   const bidModalRef = useRef(null);
-  const { user } = useContext(AuthContexts);
+  const { user } = use(AuthContexts);
+  const axiosSecure = useAxiosSecure();
+
+  const isOwner = user?.email === product?.email;
 
   useEffect(() => {
-    if (user) {
-      user.getIdToken().then((token) => {
-        axios
-          .get(`http://localhost:3000/products/bids/${productId}`, {
-            headers: { authorization: `Bearer ${token}` },
-          })
-          .then((response) => {
-            console.log("after axios get", response.data);
-            if (Array.isArray(response.data)) {
-              setBids(response.data);
-            } else {
-              setBids([]);
-            }
-          })
-          .catch((error) => {
-            console.log("axios error:", error);
-            setBids([]);
-          });
-      });
-    }
-  }, [productId, user]);
-
-  // useEffect(() => {
-  //   const headers = {};
-  //   if (user?.accessToken) {
-  //     headers.authorization = `Bearer ${user.accessToken}`;
-  //   }
-
-  //   fetch(`http://localhost:3000/products/bids/${productId}`, { headers })
-  //     .then((res) => res.json())
-  //     .then((data) => {
-  //       if (Array.isArray(data)) {
-  //         setBids(data);
-  //       } else {
-  //         setBids([]);
-  //       }
-  //     })
-  //     .catch(() => {
-  //       setBids([]);
-  //     });
-  // }, [productId, user?.accessToken]);
-
-  const handleBidModalOpen = () => {
-    bidModalRef.current.showModal();
-  };
-  const handleBidSubmit = (event) => {
-    event.preventDefault();
-    console.log("handleBidSubmit called");
-    const name = event.target.name.value;
-    const email = event.target.email.value;
-    const bid = event.target.bid.value;
-
-    const newBid = {
-      product: productId,
-      buyer_name: name,
-      buyer_email: email,
-      buyer_image: user?.photoURL,
-      bid_price: bid,
-      status: "pending",
-    };
-    console.log("Submitting bid:", newBid);
-
-    user.getIdToken().then((token) => {
-      fetch("http://localhost:3000/bids", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(newBid),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          console.log("Response data:", data);
-          if (data.insertedId) {
-            bidModalRef.current.close();
-            Swal.fire({
-              position: "top-end",
-              icon: "success",
-              title: "Your bid has been placed.",
-              showConfirmButton: false,
-              timer: 1500,
-            });
-            // add the new bid to the state
-            newBid._id = data.insertedId;
-            const newBids = [...bids, newBid];
-            newBids.sort((a, b) => b.bid_price - a.bid_price);
-            setBids(newBids);
-          }
+    if (product?._id) {
+      axiosSecure
+        .get(`/products/bids/${product._id}`)
+        .then((res) => {
+          setBids(res.data);
+          setLoading(false);
         })
         .catch((error) => {
-          console.log("Bid submit error:", error);
+          console.error("Error fetching bids:", error);
+          setLoading(false);
         });
+    }
+  }, [product, axiosSecure]);
+
+  const handleBidModalOpen = () => {
+    if (isOwner) {
+      Swal.fire("Error", "You cannot bid on your own product", "error");
+      return;
+    }
+    if (product.status === "sold") {
+      Swal.fire("Error", "This product is already sold", "error");
+      return;
+    }
+    bidModalRef.current.showModal();
+  };
+
+  const handleBidSubmit = async (e) => {
+    e.preventDefault();
+    const bid_price = parseFloat(e.target.bid.value);
+
+    if (bid_price < product.price_min || bid_price > product.price_max) {
+      Swal.fire(
+        "Invalid Bid",
+        `Bid must be between $${product.price_min} and $${product.price_max}`,
+        "error"
+      );
+      return;
+    }
+
+    const newBid = {
+      product: product._id,
+      buyer_name: user.displayName,
+      buyer_email: user.email,
+      buyer_image: user.photoURL || "",
+      buyer_contact: user.phoneNumber || "N/A",
+      bid_price,
+      status: "pending",
+    };
+
+    try {
+      const res = await axiosSecure.post("/bids", newBid);
+      if (res.data.insertedId) {
+        bidModalRef.current.close();
+        Swal.fire({
+          icon: "success",
+          title: "Bid Placed Successfully!",
+          showConfirmButton: false,
+          timer: 1500,
+        });
+        newBid._id = res.data.insertedId;
+        setBids([newBid, ...bids].sort((a, b) => b.bid_price - a.bid_price));
+        e.target.reset();
+      }
+    } catch (error) {
+      console.error("Error placing bid:", error);
+      Swal.fire(
+        "Error",
+        error.response?.data?.message || "Failed to place bid",
+        "error"
+      );
+    }
+  };
+
+  const handleAcceptBid = async (bidId) => {
+    Swal.fire({
+      title: "Accept this bid?",
+      text: "This will mark the product as sold and delete other bids",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, accept it!",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const res = await axiosSecure.patch(`/bids/status/${bidId}`, {
+            status: "confirmed",
+          });
+          if (res.data.modifiedCount || res.data.message) {
+            Swal.fire(
+              "Success!",
+              "Bid accepted. Product marked as sold!",
+              "success"
+            );
+            setBids(
+              bids
+                .filter((bid) => bid._id === bidId)
+                .map((bid) => ({ ...bid, status: "confirmed" }))
+            );
+          }
+        } catch (error) {
+          console.error("Error accepting bid:", error);
+          Swal.fire("Error", "Failed to accept bid", "error");
+        }
+      }
     });
   };
+
+  const handleRejectBid = async (bidId) => {
+    try {
+      const res = await axiosSecure.patch(`/bids/status/${bidId}`, {
+        status: "rejected",
+      });
+      if (res.data.modifiedCount) {
+        Swal.fire({
+          icon: "success",
+          title: "Bid Rejected",
+          showConfirmButton: false,
+          timer: 1500,
+        });
+        setBids(
+          bids.map((bid) =>
+            bid._id === bidId ? { ...bid, status: "rejected" } : bid
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error rejecting bid:", error);
+      Swal.fire("Error", "Failed to reject bid", "error");
+    }
+  };
+
+  const handleImageError = (e) => {
+    e.target.src = "https://via.placeholder.com/400x400?text=No+Image";
+  };
+
   return (
-    <div>
-      <div>
-        <div></div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         <div>
-          <button onClick={handleBidModalOpen} className="btn btn-primary">
-            I want to Buy this Product
-          </button>
+          <img
+            src={product.image}
+            alt={product.title}
+            className="w-full h-96 object-cover rounded-lg shadow-lg"
+            onError={handleImageError}
+          />
+        </div>
 
-          <dialog
-            ref={bidModalRef}
-            className="modal modal-bottom sm:modal-middle"
-          >
-            <div className="modal-box">
-              <h3 className="font-bold text-lg">Give the best offer!</h3>
-              <p className="py-4">Offer something seller can not resist</p>
-              <form onSubmit={handleBidSubmit}>
-                <fieldset className="fieldset">
-                  <label className="label">Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    className="input"
-                    readOnly
-                    defaultValue={user?.displayName}
-                  />
-                  <label className="label">Email</label>
-                  <input
-                    type="email"
-                    className="input"
-                    name="email"
-                    readOnly
-                    defaultValue={user?.email}
-                  />
-                  <label className="label">Bid</label>
-                  <input
-                    type="text"
-                    name="bid"
-                    className="input"
-                    placeholder="Your Bid"
-                  />
-                  <button className="btn btn-neutral mt-4">
-                    Place your bid
-                  </button>
-                </fieldset>
-              </form>
+        <div>
+          <div className="badge badge-primary mb-2">{product.category}</div>
+          <h1 className="text-4xl font-bold mb-4">{product.title}</h1>
 
-              <div className="modal-action">
-                <form method="dialog">
-                  <button className="btn">Cancel</button>
-                </form>
+          <div className="text-3xl font-bold text-primary mb-4">
+            ${product.price_min} - ${product.price_max}
+          </div>
+
+          <div className="space-y-3 mb-6">
+            <p className="flex items-center gap-2">
+              <span className="font-semibold">Condition:</span>
+              <span className="badge badge-outline">{product.condition}</span>
+            </p>
+            <p className="flex items-center gap-2">
+              <span className="font-semibold">Usage:</span> {product.usage}
+            </p>
+            <p className="flex items-center gap-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+              </svg>
+              {product.location}
+            </p>
+            <p className="flex items-center gap-2">
+              <span className="font-semibold">Posted:</span>
+              {new Date(product.created_at).toLocaleDateString()}
+            </p>
+            <p className="flex items-center gap-2">
+              <span className="font-semibold">Status:</span>
+              {product.status === "pending" ? (
+                <span className="badge badge-warning">Available</span>
+              ) : (
+                <span className="badge badge-success">Sold</span>
+              )}
+            </p>
+          </div>
+
+          <div className="mb-6">
+            <h3 className="text-xl font-semibold mb-2">Description</h3>
+            <p className="text-gray-600">{product.description}</p>
+          </div>
+
+          <div className="mb-6 p-4 bg-base-200 rounded-lg">
+            <h3 className="text-lg font-semibold mb-3">Seller Information</h3>
+            <div className="flex items-center gap-3">
+              <div className="avatar">
+                <div className="w-12 rounded-full">
+                  <img
+                    src={product.seller_image}
+                    alt={product.seller_name}
+                    onError={handleImageError}
+                  />
+                </div>
+              </div>
+              <div>
+                <p className="font-semibold">{product.seller_name}</p>
+                <p className="text-sm text-gray-600">
+                  {product.seller_contact}
+                </p>
               </div>
             </div>
-          </dialog>
+          </div>
+
+          {!isOwner && product.status === "pending" && (
+            <button
+              onClick={handleBidModalOpen}
+              className="btn btn-primary btn-lg w-full"
+            >
+              Place Your Bid
+            </button>
+          )}
         </div>
       </div>
+
+      <div className="divider"></div>
+
       <div>
-        <h3 className="text-3xl">
+        <h3 className="text-3xl font-bold mb-6">
           Bids for this Product:{" "}
           <span className="text-primary">{bids.length}</span>
         </h3>
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>SL No.</th>
-                <th>Buyer Name</th>
-                <th>Buyer Email</th>
-                <th>Bid Price</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bids.map((bid, index) => (
-                <tr key={bid._id}>
-                  <th>{index + 1}</th>
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <div className="avatar">
-                        <div className="mask mask-squircle h-12 w-12">
-                          <img
-                            src="https://img.daisyui.com/images/profile/demo/2@94.webp"
-                            alt="Avatar Tailwind CSS Component"
-                          />
+
+        {loading ? (
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="skeleton h-20 w-full"></div>
+            ))}
+          </div>
+        ) : bids.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500">No bids yet. Be the first to bid!</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="table table-zebra">
+              <thead>
+                <tr>
+                  <th>SL No.</th>
+                  <th>Buyer</th>
+                  <th>Bid Price</th>
+                  <th>Status</th>
+                  {isOwner && <th>Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {bids.map((bid, index) => (
+                  <tr key={bid._id}>
+                    <td>{index + 1}</td>
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <div className="avatar">
+                          <div className="mask mask-squircle h-12 w-12">
+                            <img
+                              src={
+                                bid.buyer_image ||
+                                "https://via.placeholder.com/50"
+                              }
+                              alt={bid.buyer_name}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-bold">{bid.buyer_name}</div>
+                          <div className="text-sm opacity-50">
+                            {bid.buyer_email}
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <div className="font-bold">{bid.buyer_name}</div>
-                        <div className="text-sm opacity-50">United States</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>{bid.buyer_email}</td>
-                  <td>{bid.bid_price}</td>
-                  <th>
-                    <button className="btn btn-ghost btn-xs">details</button>
-                  </th>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </td>
+                    <td className="text-lg font-semibold text-primary">
+                      ${bid.bid_price}
+                    </td>
+                    <td>
+                      {bid.status === "pending" && (
+                        <span className="badge badge-warning">Pending</span>
+                      )}
+                      {bid.status === "confirmed" && (
+                        <span className="badge badge-success">Accepted</span>
+                      )}
+                      {bid.status === "rejected" && (
+                        <span className="badge badge-error">Rejected</span>
+                      )}
+                    </td>
+                    {isOwner && bid.status === "pending" && (
+                      <td>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleAcceptBid(bid._id)}
+                            className="btn btn-success btn-sm"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => handleRejectBid(bid._id)}
+                            className="btn btn-error btn-sm"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      <dialog ref={bidModalRef} className="modal modal-bottom sm:modal-middle">
+        <div className="modal-box">
+          <h3 className="font-bold text-lg mb-2">Place Your Bid</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Bid range: ${product.price_min} - ${product.price_max}
+          </p>
+
+          <form onSubmit={handleBidSubmit}>
+            <div className="form-control mb-4">
+              <label className="label">Name</label>
+              <input
+                type="text"
+                className="input input-bordered"
+                value={user?.displayName || ""}
+                readOnly
+              />
+            </div>
+
+            <div className="form-control mb-4">
+              <label className="label">Email</label>
+              <input
+                type="email"
+                className="input input-bordered"
+                value={user?.email || ""}
+                readOnly
+              />
+            </div>
+
+            <div className="form-control mb-4">
+              <label className="label">Your Bid Amount ($)</label>
+              <input
+                type="number"
+                name="bid"
+                className="input input-bordered"
+                placeholder={`Between ${product.price_min} and ${product.price_max}`}
+                required
+                min={product.price_min}
+                max={product.price_max}
+                step="0.01"
+              />
+            </div>
+
+            <div className="modal-action">
+              <button type="submit" className="btn btn-primary">
+                Place Bid
+              </button>
+              <button
+                type="button"
+                onClick={() => bidModalRef.current.close()}
+                className="btn"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </dialog>
     </div>
   );
 };
