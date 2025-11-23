@@ -22,6 +22,10 @@ const AllProducts = () => {
       });
   }, []);
 
+  const handleImageError = (e) => {
+    e.target.src = "https://via.placeholder.com/400x300?text=No+Image";
+  };
+
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.title
       .toLowerCase()
@@ -105,6 +109,7 @@ const AllProducts = () => {
                   src={product.image}
                   alt={product.title}
                   className="rounded-xl h-48 w-full object-cover"
+                  onError={handleImageError}
                 />
               </figure>
               <div className="card-body p-4">

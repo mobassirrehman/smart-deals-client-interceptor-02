@@ -21,7 +21,7 @@ const MyBids = () => {
             setBids([]);
           }
         })
-        .catch((error) => {
+        .catch(() => {
           setBids([]);
         });
     }
