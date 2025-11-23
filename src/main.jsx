@@ -13,6 +13,7 @@ import MyBids from "./components/MyBids/MyBids.jsx";
 import ProductDetails from "./components/ProductDetails/ProductDetails.jsx";
 import PrivateRoute from "./Routes/PrivateRoute.jsx";
 import CreateAProduct from "./components/CreateAProduct/CreateAProduct.jsx";
+import EditProduct from "./components/EditProduct/EditProduct.jsx";
 
 const router = createBrowserRouter([
   {
@@ -54,7 +55,9 @@ const router = createBrowserRouter([
       {
         path: "productDetails/:id",
         loader: async ({ params }) => {
-          const response = await fetch(`http://localhost:3000/products/${params.id}`);
+          const response = await fetch(
+            `http://localhost:3000/products/${params.id}`
+          );
           return response.json();
         },
         element: (
@@ -68,6 +71,14 @@ const router = createBrowserRouter([
         element: (
           <PrivateRoute>
             <CreateAProduct></CreateAProduct>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "editProduct/:id",
+        element: (
+          <PrivateRoute>
+            <EditProduct></EditProduct>
           </PrivateRoute>
         ),
       },
