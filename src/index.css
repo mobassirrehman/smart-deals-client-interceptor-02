@@ -6,3 +6,9 @@
   --color-primary: purple;
   --color-secondary: teal;
 }
+
+@layer base {
+  body {
+    @apply bg-gray-50;
+  }
+}
