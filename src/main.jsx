@@ -14,11 +14,13 @@ import ProductDetails from "./components/ProductDetails/ProductDetails.jsx";
 import PrivateRoute from "./Routes/PrivateRoute.jsx";
 import CreateAProduct from "./components/CreateAProduct/CreateAProduct.jsx";
 import EditProduct from "./components/EditProduct/EditProduct.jsx";
+import ErrorPage from "./components/ErrorPage/ErrorPage.jsx";
 
 const router = createBrowserRouter([
   {
     path: "/",
     Component: RootLayout,
+    errorElement: <ErrorPage />,
     children: [
       {
         Component: Home,
